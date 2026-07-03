@@ -2,7 +2,8 @@ use microgradrs::{Operation, Value};
 
 fn main() {
     let mut a = Value::new(1.0);
-    print!("{:?}", a);
+    println!("{:?}", a);
     let mut b = Value::new(2.0);
-    let mut c = a * b;
+    let mut c = a + b;
+    print!("{:?}", c);
 }
