@@ -4,6 +4,6 @@ fn main() {
     let mut a = Value::new(1.0);
     let mut b = Value::new(2.0);
     let mut c = &a + &b;
-    let d = &(&a + &b) + &c;
+    let d = &(&a * &b) + &c;
     println!("{:?}", d)
 }
