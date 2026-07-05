@@ -9,7 +9,7 @@ pub struct ValueData {
     pub parents: Vec<Value>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Value(Rc<RefCell<ValueData>>);
 
 impl Value {
@@ -75,6 +75,12 @@ impl<'a, 'b> Mul<&'b Value> for &'a Value {
             gradient: 0.0,
             parents: vec![self.clone(), rhs.clone()],
         })))
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
