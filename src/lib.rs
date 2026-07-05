@@ -1,7 +1,7 @@
 use std::cell::{Ref, RefCell};
 use std::ops::{Add, Mul};
 use std::rc::Rc;
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ValueData {
     pub data: f32,
     pub op: Operation,
@@ -9,7 +9,7 @@ pub struct ValueData {
     pub parents: Vec<Value>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Value(Rc<RefCell<ValueData>>);
 
 impl Value {
@@ -78,11 +78,43 @@ impl<'a, 'b> Mul<&'b Value> for &'a Value {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Operation {
     Add,
     Mul,
     None,
+}
+
+pub fn topo_sort(last: Value) -> Vec<Value> {
+    let mut sorted: Vec<Value> = Vec::new();
+    let mut visited: Vec<Value> = vec![last.clone()];
+    let mut stack: Vec<Value> = vec![last.clone()];
+    while !stack.is_empty() {
+        if let Some(last) = stack.last().cloned() {
+            let mut unvisited_flag = false;
+            for parent in &last.0.borrow().parents {
+                if !visited.contains(parent) {
+                    visited.push(parent.clone());
+                    stack.push(parent.clone());
+                    unvisited_flag = true;
+                } else {
+                    continue;
+                }
+            }
+            if !unvisited_flag && let Some(last_item) = stack.pop() {
+                sorted.push(last_item);
+            }
+        }
+    }
+    sorted.reverse();
+    sorted[0].0.borrow_mut().gradient = 1.0;
+    sorted
+}
+
+pub fn back_propogate(list: &mut Vec<Value>) {
+    for node in list {
+        node.backward();
+    }
 }
 
 #[cfg(test)]
