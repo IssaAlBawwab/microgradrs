@@ -13,7 +13,6 @@ pub struct ValueData {
 pub struct Value(Rc<RefCell<ValueData>>);
 
 impl Value {
-    //pub fn backward(dyn  ) ->
     pub fn new(data: f32) -> Value {
         Value(Rc::new(RefCell::new(ValueData {
             data,
