@@ -116,7 +116,7 @@ pub fn topo_sort(last: Value) -> Vec<Value> {
     sorted
 }
 
-pub fn back_propogate(last: Value) -> Vec<Value> {
+pub fn back_propagate(last: Value) -> Vec<Value> {
     let mut list = topo_sort(last);
     list.iter_mut().for_each(|node| node.backward());
     list
