@@ -47,7 +47,17 @@ impl Value {
                 p2.0.borrow_mut().gradient += self.gradient() * p1_data;
             }
             Operation::None => {}
+            Operation::Relu => {}
         }
+    }
+    pub fn relu(&self) -> Value {
+        let val = self.data();
+        Value(Rc::new(RefCell::new(ValueData {
+            data: val.max(0.0),
+            op: Operation::Relu,
+            gradient: 0.0,
+            parents: vec![self.clone()],
+        })))
     }
 }
 
@@ -94,6 +104,7 @@ pub enum Operation {
     Add,
     Mul,
     None,
+    Relu,
 }
 
 pub fn topo_sort(last: Value) -> Vec<Value> {
