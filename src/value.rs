@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::ops::{Add, Mul};
+use std::ops::{Add, AddAssign, Mul};
 use std::rc::Rc;
 #[derive(Debug, PartialEq)]
 pub struct ValueData {
@@ -80,6 +80,12 @@ impl<'a, 'b> Mul<&'b Value> for &'a Value {
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl<'a> AddAssign<&'a Value> for Value {
+    fn add_assign(&mut self, rhs: &'a Value) {
+        *self = &*self + rhs;
     }
 }
 

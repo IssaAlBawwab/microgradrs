@@ -24,10 +24,12 @@ impl Neuron {
         }
     }
 
-    pub fn forward<T>(&self, input_data: &[T])
-    where
-        T: Add<Output = T> + Copy + Mul<Output = T>,
-    {
-        !todo!()
+    pub fn forward(&mut self, data: &[Value]) -> Value {
+        let mut total = self.bias.clone();
+        for (w, x) in self.weights.iter().zip(data.iter()) {
+            let product = w * x;
+            total += &product;
+        }
+        total
     }
 }
