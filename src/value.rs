@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::Write;
 use std::ops::{Add, AddAssign, Mul};
 use std::rc::Rc;
 #[derive(Debug, PartialEq)]
@@ -137,6 +138,62 @@ pub fn back_propagate(last: Value) -> Vec<Value> {
     let mut list = topo_sort(last);
     list.iter_mut().for_each(|node| node.backward());
     list
+}
+
+/// render with: `dot -Tsvg graph.dot -o graph.svg`
+pub fn to_dot(root: &Value) -> String {
+    let mut dot = String::new();
+    writeln!(dot, "digraph {{").unwrap();
+    writeln!(dot, "    rankdir=LR;").unwrap();
+    writeln!(dot, "    node [shape=record];").unwrap();
+
+    let mut visited: Vec<Value> = Vec::new();
+    let mut stack: Vec<Value> = vec![root.clone()];
+
+    while let Some(node) = stack.pop() {
+        if visited.contains(&node) {
+            continue;
+        }
+        visited.push(node.clone());
+
+        let id = node_id(&node);
+        let data = node.data();
+        let grad = node.gradient();
+        let op = node.op();
+
+        writeln!(
+            dot,
+            "    {id} [label=\"{{ data: {data:.4} | grad: {grad:.4} }}\"];",
+        )
+        .unwrap();
+
+        if op != Operation::None {
+            let op_id = format!("{id}_op");
+            let op_label = match op {
+                Operation::Add => "+",
+                Operation::Mul => "*",
+                Operation::Relu => "ReLU",
+                Operation::None => unreachable!(),
+            };
+            writeln!(dot, "    {op_id} [label=\"{op_label}\", shape=circle];").unwrap();
+            writeln!(dot, "    {op_id} -> {id};").unwrap();
+
+            let borrowed = node.0.borrow();
+            for parent in &borrowed.parents {
+                let parent_id = node_id(parent);
+                writeln!(dot, "    {parent_id} -> {op_id};").unwrap();
+                stack.push(parent.clone());
+            }
+        }
+    }
+
+    writeln!(dot, "}}").unwrap();
+    dot
+}
+
+fn node_id(value: &Value) -> String {
+    let ptr = Rc::as_ptr(&value.0) as usize;
+    format!("node_{ptr:x}")
 }
 
 #[cfg(test)]
