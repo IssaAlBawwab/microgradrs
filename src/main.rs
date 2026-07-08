@@ -2,12 +2,15 @@ use microgradrs::layer::{self, Layer};
 use microgradrs::nn::Neuron;
 use microgradrs::value::{Value, back_propagate, to_dot, topo_sort};
 use std::fs;
+use std::process::Output;
 fn main() {
-    let data = vec![Value::new(-5.0), Value::new(-5.0), Value::new(5.0)];
+    let data = vec![Value::new(3.0), Value::new(2.0), Value::new(-3.0)];
 
     let layer = Layer::new(3, 1);
-    let output = layer.forward(&data);
+    let mut output = layer.forward(&data);
+    output = Layer::new(1, 1).forward(&output);
     let mut final_output = Value::new(0.0);
+
     for val in output.iter() {
         final_output += val;
     }

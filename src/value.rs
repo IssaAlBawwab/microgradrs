@@ -48,7 +48,14 @@ impl Value {
                 p2.0.borrow_mut().gradient += self.gradient() * p1_data;
             }
             Operation::None => {}
-            Operation::Relu => {}
+            Operation::Relu => {
+                let grad = if self.data() > 1e-9 {
+                    self.gradient()
+                } else {
+                    0.0
+                };
+                self.0.borrow_mut().parents[0].0.borrow_mut().gradient += grad;
+            }
         }
     }
     pub fn relu(&self) -> Value {
