@@ -30,7 +30,6 @@ impl Neuron {
             let product = w * x;
             total += &product;
         }
-        total.relu();
-        total
+        total.relu()
     }
 }
