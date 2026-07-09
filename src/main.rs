@@ -7,13 +7,10 @@ fn main() {
     let data = vec![Value::new(3.0), Value::new(2.0), Value::new(-3.0)];
 
     let layer = Layer::new(3, 1);
-    let mut output = layer.forward(&data);
-    output = Layer::new(1, 1).forward(&output);
-    let mut final_output = Value::new(0.0);
+    let mut output = layer.forward(&data, true);
+    let output_len = output.len() as i32;
+    output = Layer::new(output_len, 1).forward(&output, false);
 
-    for val in output.iter() {
-        final_output += val;
-    }
-    let final_output = &back_propagate(final_output)[0];
+    let final_output = &back_propagate(output[0].clone())[0];
     fs::write("graph.dot", to_dot(final_output));
 }

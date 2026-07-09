@@ -67,6 +67,9 @@ impl Value {
             parents: vec![self.clone()],
         })))
     }
+    pub fn mse(&self, truth: f32) -> f32 {
+        0.5 * (self.data() - truth).powi(2)
+    }
 }
 
 impl<'a, 'b> Add<&'b Value> for &'a Value {

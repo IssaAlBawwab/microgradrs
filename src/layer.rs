@@ -13,11 +13,15 @@ impl Layer {
         Layer { neurons }
     }
 
-    pub fn forward(&self, data: &[Value]) -> Vec<Value> {
+    pub fn forward(&self, data: &[Value], activation: bool) -> Vec<Value> {
         let mut output = Vec::new();
         for neuron in &self.neurons {
-            output.push(neuron.forward(data));
+            output.push(neuron.forward(data, activation));
         }
         output
     }
 }
+
+// pub fn fit(last: &m Layer, xs: &[f32], ys: &[f32]) {
+//
+// }
