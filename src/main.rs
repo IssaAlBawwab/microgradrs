@@ -1,16 +1,29 @@
-use microgradrs::layer::{self, Layer};
-use microgradrs::nn::Neuron;
-use microgradrs::value::{Value, back_propagate, to_dot, topo_sort};
-use std::fs;
-use std::process::Output;
+use microgradrs::layer::Layer;
+use microgradrs::model::Model;
+use rand::{Rng, RngExt};
+
+fn poly(a: f32, b: f32, c: f32) -> f32 {
+    2.0 * a + 3.0 * b - c
+}
+
 fn main() {
-    let data = vec![Value::new(3.0), Value::new(2.0), Value::new(-3.0)];
+    let mut rng = rand::rng();
+    let sample_count = 64;
 
-    let layer = Layer::new(3, 1);
-    let mut output = layer.forward(&data, true);
-    let output_len = output.len() as i32;
-    output = Layer::new(output_len, 1).forward(&output, false);
+    let mut data: Vec<Vec<f32>> = Vec::new();
+    let mut truth: Vec<Vec<f32>> = Vec::new();
 
-    let final_output = &back_propagate(output[0].clone())[0];
-    fs::write("graph.dot", to_dot(final_output));
+    for _ in 0..sample_count {
+        let a: f32 = rng.random();
+        let b: f32 = rng.random();
+        let c: f32 = rng.random();
+        data.push(vec![a, b, c]);
+        truth.push(vec![poly(a, b, c)]);
+    }
+
+    let layer = Layer::new(3, 8);
+    let layer_2 = Layer::new(8, 1);
+    let mut model = Model::new(vec![layer, layer_2]);
+
+    model.fit(200, data, truth, 0.05);
 }

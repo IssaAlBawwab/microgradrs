@@ -20,4 +20,11 @@ impl Layer {
         }
         output
     }
+    pub fn parameters(&self) -> Vec<Value> {
+        let mut params = Vec::new();
+        for neuron in &self.neurons {
+            params.extend(neuron.parameters());
+        }
+        params
+    }
 }

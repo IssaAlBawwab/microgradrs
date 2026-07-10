@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::fmt::Write;
-use std::ops::{Add, AddAssign, Mul};
+use std::ops::{Add, AddAssign, Mul, Sub};
 use std::rc::Rc;
 #[derive(Debug, PartialEq)]
 pub struct ValueData {
@@ -31,12 +31,25 @@ impl Value {
     pub fn op(&self) -> Operation {
         self.0.borrow().op
     }
+    pub fn update_gradient(&self, value: f32) {
+        self.0.borrow_mut().gradient = value;
+    }
+    pub fn subtract_value(&self, value: f32) {
+        self.0.borrow_mut().data -= value;
+    }
+    pub fn zero_gradient(&self) {
+        self.0.borrow_mut().gradient = 0.0;
+    }
     pub fn backward(&mut self) {
         match self.op() {
             Operation::Add => {
                 for parent in &self.0.borrow().parents {
-                    parent.0.borrow_mut().gradient += self.gradient() * 1.0;
+                    parent.0.borrow_mut().gradient += self.gradient();
                 }
+            }
+            Operation::Sub => {
+                self.0.borrow().parents[0].0.borrow_mut().gradient += self.gradient();
+                self.0.borrow().parents[1].0.borrow_mut().gradient += -self.gradient();
             }
             Operation::Mul => {
                 let data = self.0.borrow();
@@ -98,6 +111,19 @@ impl<'a, 'b> Mul<&'b Value> for &'a Value {
     }
 }
 
+impl<'a, 'b> Sub<&'b Value> for &'a Value {
+    type Output = Value;
+    fn sub(self, rhs: &'b Value) -> Self::Output {
+        let data = self.data() - rhs.data();
+        Value(Rc::new(RefCell::new(ValueData {
+            data,
+            op: Operation::Sub,
+            gradient: 0.0,
+            parents: vec![self.clone(), rhs.clone()],
+        })))
+    }
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
@@ -114,6 +140,7 @@ impl<'a> AddAssign<&'a Value> for Value {
 pub enum Operation {
     Add,
     Mul,
+    Sub,
     None,
     Relu,
 }
@@ -182,6 +209,7 @@ pub fn to_dot(root: &Value) -> String {
                 Operation::Add => "+",
                 Operation::Mul => "*",
                 Operation::Relu => "ReLU",
+                Operation::Sub => "-",
                 Operation::None => unreachable!(),
             };
             writeln!(dot, "    {op_id} [label=\"{op_label}\", shape=circle];").unwrap();

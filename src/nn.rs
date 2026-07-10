@@ -32,4 +32,11 @@ impl Neuron {
         }
         if activation { total.relu() } else { total }
     }
+    pub fn parameters(&self) -> Vec<Value> {
+        let mut params = vec![self.bias.clone()];
+        for weight in &self.weights {
+            params.push(weight.clone());
+        }
+        params
+    }
 }
