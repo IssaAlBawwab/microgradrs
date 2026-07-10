@@ -21,7 +21,3 @@ impl Layer {
         output
     }
 }
-
-// pub fn fit(last: &m Layer, xs: &[f32], ys: &[f32]) {
-//
-// }

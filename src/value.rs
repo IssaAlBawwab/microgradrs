@@ -140,7 +140,6 @@ pub fn topo_sort(last: Value) -> Vec<Value> {
         }
     }
     sorted.reverse();
-    sorted[0].0.borrow_mut().gradient = 1.0;
     sorted
 }
 
