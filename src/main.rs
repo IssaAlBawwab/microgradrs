@@ -1,7 +1,7 @@
 use microgradrs::layer::Layer;
 use microgradrs::model::Model;
 use rand::{Rng, RngExt};
-
+use ndarray::Array2;
 fn poly(a: f32, b: f32, c: f32) -> f32 {
     2.0 * a + 3.0 * b - c
 }

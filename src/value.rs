@@ -1,12 +1,13 @@
+use ndarray::{Array, Array2, ArrayRef2, ArrayView2};
 use std::cell::{Ref, RefCell};
 use std::fmt::Write;
 use std::ops::{Add, AddAssign, Mul, Sub};
 use std::rc::Rc;
 #[derive(Debug, PartialEq)]
 pub struct ValueData {
-    pub data: f32,
+    pub data: Array2<f32>,
     pub op: Operation,
-    pub gradient: f32,
+    pub gradient: Array2<f32>,
     pub parents: Vec<Value>,
 }
 
@@ -14,37 +15,39 @@ pub struct ValueData {
 pub struct Value(Rc<RefCell<ValueData>>);
 
 impl Value {
-    pub fn new(data: f32) -> Value {
+    pub fn new(data: Array2<f32>) -> Value {
         Value(Rc::new(RefCell::new(ValueData {
+            gradient: Array::zeros(data.raw_dim()),
             data,
             op: Operation::None,
-            gradient: 0.0,
             parents: vec![],
         })))
     }
-    pub fn data(&self) -> f32 {
-        self.0.borrow().data
+    pub fn data<'a>(&'a self) -> Ref<'_, Array2<f32>> {
+        Ref::map(self.0.borrow(), |value_data| &value_data.data)
     }
-    pub fn gradient(&self) -> f32 {
-        self.0.borrow().gradient
+    pub fn gradient<'a>(&'a self) -> Ref<'_, Array2<f32>> {
+        Ref::map(self.0.borrow(), |value_data| &value_data.gradient)
     }
     pub fn op(&self) -> Operation {
         self.0.borrow().op
     }
-    pub fn update_gradient(&self, value: f32) {
+    pub fn update_gradient(&self, value: Array2<f32>) {
         self.0.borrow_mut().gradient = value;
     }
     pub fn subtract_value(&self, value: f32) {
         self.0.borrow_mut().data -= value;
     }
     pub fn zero_gradient(&self) {
-        self.0.borrow_mut().gradient = 0.0;
+        self.0.borrow_mut().gradient.fill(0.0);
     }
     pub fn backward(&mut self) {
         match self.op() {
             Operation::Add => {
                 for parent in &self.0.borrow().parents {
-                    parent.0.borrow_mut().gradient += self.gradient();
+                    if parent.data().shape() == self.data().shape() {
+                        parent.0.borrow_mut().gradient += &*self.gradient();
+                    }
                 }
             }
             Operation::Sub => {
