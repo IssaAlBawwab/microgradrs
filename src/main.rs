@@ -1,29 +1,27 @@
+use microgradrs::data::{argmax, load_mnist};
 use microgradrs::layer::Layer;
 use microgradrs::model::Model;
-use ndarray::{Array2, array};
-use rand::{Rng, RngExt};
-fn poly(a: f32, b: f32, c: f32) -> f32 {
-    2.0 * a + 3.0 * b - c
-}
+use microgradrs::value::Value;
 
 fn main() {
-    let mut rng = rand::rng();
-    let sample_count = 64;
+    let train_count = 1000;
+    let (images, labels) = load_mnist(train_count);
 
-    let mut data: Vec<Array2<f32>> = Vec::new();
-    let mut truth: Vec<Array2<f32>> = Vec::new();
+    let eval_images: Vec<_> = images.iter().take(100).cloned().collect();
+    let eval_labels: Vec<_> = labels.iter().take(100).cloned().collect();
 
-    for _ in 0..sample_count {
-        let a: f32 = rng.random();
-        let b: f32 = rng.random();
-        let c: f32 = rng.random();
-        data.push(array![[a, b, c]]);
-        truth.push(array![[poly(a, b, c)]]);
+    let mut model = Model::new(vec![Layer::new(784, 64), Layer::new(64, 10)]);
+
+    model.fit(5, images, labels, 0.01);
+
+    let mut correct = 0;
+    for (img, label) in eval_images.iter().zip(eval_labels.iter()) {
+        let pred = model.forward(&Value::new(img.clone()));
+        println!("{}", pred.data());
+        let out = pred.data();
+        if argmax(&out) == argmax(label) {
+            correct += 1;
+        }
     }
-
-    let layer = Layer::new(3, 8);
-    let layer_2 = Layer::new(8, 1);
-    let mut model = Model::new(vec![layer, layer_2]);
-
-    model.fit(200, data, truth, 0.05);
+    println!("accuracy: {}/{}", correct, eval_images.len());
 }

@@ -10,14 +10,11 @@ pub struct Layer {
 impl Layer {
     pub fn new(input_size: usize, output_size: usize) -> Layer {
         let mut rng = rand::rng();
-        let weights = Array2::from_shape_fn((input_size, output_size), |idx| {
-            let number: f32 = rng.random();
-            number
+        let scale = 1.0 / (input_size as f32).sqrt();
+        let weights = Array2::from_shape_fn((input_size, output_size), |_| {
+            (rng.random::<f32>() - 0.5) * scale
         });
-        let bias = Array2::from_shape_fn((1, output_size), |idx| {
-            let number: f32 = rng.random();
-            number
-        });
+        let bias = Array2::zeros((1, output_size));
         Layer {
             weights: Value::new(weights),
             bias: Value::new(bias),
