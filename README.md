@@ -1,6 +1,5 @@
 ## The write up
-https://issabawwab.pages.dev/posts/micrograd-from-scratch/
-
+https://issabawwab.pages.dev/posts/tensorizing-micrograd/
 ## MNIST data
 The `data/` dir is gitignored, get the files before running:
 ```
