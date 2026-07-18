@@ -1,30 +1,38 @@
-use crate::{nn::Neuron, value::Value};
+use crate::value::Value;
+use ndarray::Array2;
+use rand::{Rng, RngExt};
 #[derive(Debug)]
 pub struct Layer {
-    neurons: Vec<Neuron>,
+    weights: Value,
+    bias: Value,
 }
 
 impl Layer {
-    pub fn new(num_inputs: i32, num_neurons: i32) -> Layer {
-        let mut neurons = Vec::new();
-        for _ in 0..num_neurons {
-            neurons.push(Neuron::new(num_inputs));
+    pub fn new(input_size: usize, output_size: usize) -> Layer {
+        let mut rng = rand::rng();
+        let weights = Array2::from_shape_fn((input_size, output_size), |idx| {
+            let number: f32 = rng.random();
+            number
+        });
+        let bias = Array2::from_shape_fn((1, output_size), |idx| {
+            let number: f32 = rng.random();
+            number
+        });
+        Layer {
+            weights: Value::new(weights),
+            bias: Value::new(bias),
         }
-        Layer { neurons }
     }
 
-    pub fn forward(&self, data: &[Value], activation: bool) -> Vec<Value> {
-        let mut output = Vec::new();
-        for neuron in &self.neurons {
-            output.push(neuron.forward(data, activation));
+    pub fn forward(&self, data: &Value, activation: bool) -> Value {
+        let mut output = data.matmul(&self.weights);
+        output += &self.bias;
+        if activation {
+            output = output.relu();
         }
         output
     }
     pub fn parameters(&self) -> Vec<Value> {
-        let mut params = Vec::new();
-        for neuron in &self.neurons {
-            params.extend(neuron.parameters());
-        }
-        params
+        vec![self.weights.clone(), self.bias.clone()]
     }
 }

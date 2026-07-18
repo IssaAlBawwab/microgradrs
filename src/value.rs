@@ -1,4 +1,4 @@
-use ndarray::{Array, Array2, ArrayRef2, ArrayView2};
+use ndarray::{Array, Array2, ArrayRef2, ArrayView2, Axis, Zip};
 use std::cell::{Ref, RefCell};
 use std::fmt::Write;
 use std::ops::{Add, AddAssign, Mul, Sub};
@@ -35,8 +35,8 @@ impl Value {
     pub fn update_gradient(&self, value: Array2<f32>) {
         self.0.borrow_mut().gradient = value;
     }
-    pub fn subtract_value(&self, value: f32) {
-        self.0.borrow_mut().data -= value;
+    pub fn subtract_value(&self, value: Array2<f32>) {
+        self.0.borrow_mut().data -= &value;
     }
     pub fn zero_gradient(&self) {
         self.0.borrow_mut().gradient.fill(0.0);
@@ -45,57 +45,90 @@ impl Value {
         match self.op() {
             Operation::Add => {
                 for parent in &self.0.borrow().parents {
-                    if parent.data().shape() == self.data().shape() {
-                        parent.0.borrow_mut().gradient += &*self.gradient();
-                    }
+                    let g = self.gradient();
+                    let parent_shape = parent.data().shape().to_vec();
+                    parent.0.borrow_mut().gradient += &unbroadcast(&g, &parent_shape)
                 }
             }
             Operation::Sub => {
-                self.0.borrow().parents[0].0.borrow_mut().gradient += self.gradient();
-                self.0.borrow().parents[1].0.borrow_mut().gradient += -self.gradient();
+                let g = self.gradient();
+                let shape = self.data().shape().to_vec();
+                self.0.borrow().parents[0].0.borrow_mut().gradient += &unbroadcast(&g, &shape);
+                self.0.borrow().parents[1].0.borrow_mut().gradient -= &unbroadcast(&g, &shape);
             }
             Operation::Mul => {
                 let data = self.0.borrow();
                 let p1 = &data.parents[0];
                 let p2 = &data.parents[1];
-                let p1_data = p1.data();
-                let p2_data = p2.data();
-                p1.0.borrow_mut().gradient += self.gradient() * p2_data;
-                p2.0.borrow_mut().gradient += self.gradient() * p1_data;
+                let p1_shape = p1.data().shape().to_vec();
+                let p2_shape = p2.data().shape().to_vec();
+                let p2_mul = &(&*self.gradient() * &*p2.data());
+                let p1_mul = &(&*self.gradient() * &*p1.data());
+                p1.0.borrow_mut().gradient += &unbroadcast(p2_mul, &p1_shape);
+                p2.0.borrow_mut().gradient += &unbroadcast(p1_mul, &p2_shape);
+            }
+            Operation::MatMul => {
+                let data = self.0.borrow();
+                let p1 = &data.parents[0];
+                let p2 = &data.parents[1];
+                p1.0.borrow_mut().gradient += &(self.gradient().dot(&p2.data().t()));
+                p2.0.borrow_mut().gradient += &(p1.data().t().dot(&*self.gradient()));
             }
             Operation::None => {}
             Operation::Relu => {
-                let grad = if self.data() > 1e-9 {
-                    self.gradient()
-                } else {
-                    0.0
-                };
-                self.0.borrow_mut().parents[0].0.borrow_mut().gradient += grad;
+                let grad = Zip::from(&*self.data())
+                    .and(&*self.gradient())
+                    .map_collect(|d, g| if *d > 0.0 { *g } else { 0.0 });
+                self.0.borrow_mut().parents[0].0.borrow_mut().gradient += &grad;
             }
         }
     }
     pub fn relu(&self) -> Value {
         let val = self.data();
         Value(Rc::new(RefCell::new(ValueData {
-            data: val.max(0.0),
+            data: val.mapv(|element| if element > 0.0 { element } else { 0.0 }),
             op: Operation::Relu,
-            gradient: 0.0,
+            gradient: Array::zeros(val.raw_dim()),
             parents: vec![self.clone()],
         })))
     }
-    pub fn mse(&self, truth: f32) -> f32 {
-        0.5 * (self.data() - truth).powi(2)
+    pub fn mse(&self, truth: &Array2<f32>) -> Array2<f32> {
+        0.5 * (&*self.data() - truth).powi(2)
+    }
+    pub fn matmul(&self, rhs: &Self) -> Self {
+        assert!(
+            self.data().shape()[1] == rhs.data().shape()[0],
+            "Matmul dims not correct: lhs: {:?}, rhs: {:?}",
+            self.data().shape(),
+            rhs.data().shape()
+        );
+        let data = self.data().dot(&*rhs.data());
+        Value(Rc::new(RefCell::new(ValueData {
+            gradient: Array::zeros(data.raw_dim()),
+            data,
+            op: Operation::MatMul,
+            parents: vec![self.clone(), rhs.clone()],
+        })))
     }
 }
-
+fn unbroadcast(g: &Array2<f32>, target: &[usize]) -> Array2<f32> {
+    let mut g = g.clone();
+    if target[0] == 1 && g.shape()[0] > 1 {
+        g = g.sum_axis(Axis(0)).insert_axis(Axis(0));
+    }
+    if target[1] == 1 && g.shape()[1] > 1 {
+        g = g.sum_axis(Axis(1)).insert_axis(Axis(1));
+    }
+    g
+}
 impl<'a, 'b> Add<&'b Value> for &'a Value {
     type Output = Value;
     fn add(self, other: &'b Value) -> Value {
-        let data = self.data() + other.data();
+        let data = &*self.data() + &*other.data();
         Value(Rc::new(RefCell::new(ValueData {
+            gradient: Array::zeros(data.raw_dim()),
             data,
             op: Operation::Add,
-            gradient: 0.0,
             parents: vec![self.clone(), other.clone()],
         })))
     }
@@ -104,11 +137,11 @@ impl<'a, 'b> Add<&'b Value> for &'a Value {
 impl<'a, 'b> Mul<&'b Value> for &'a Value {
     type Output = Value;
     fn mul(self, rhs: &'b Value) -> Self::Output {
-        let data = self.data() * rhs.data();
+        let data = &*self.data() * &*rhs.data();
         Value(Rc::new(RefCell::new(ValueData {
+            gradient: Array::zeros(data.raw_dim()),
             data,
             op: Operation::Mul,
-            gradient: 0.0,
             parents: vec![self.clone(), rhs.clone()],
         })))
     }
@@ -117,11 +150,11 @@ impl<'a, 'b> Mul<&'b Value> for &'a Value {
 impl<'a, 'b> Sub<&'b Value> for &'a Value {
     type Output = Value;
     fn sub(self, rhs: &'b Value) -> Self::Output {
-        let data = self.data() - rhs.data();
+        let data = &*self.data() - &*rhs.data();
         Value(Rc::new(RefCell::new(ValueData {
+            gradient: Array::zeros(data.raw_dim()),
             data,
             op: Operation::Sub,
-            gradient: 0.0,
             parents: vec![self.clone(), rhs.clone()],
         })))
     }
@@ -146,6 +179,7 @@ pub enum Operation {
     Sub,
     None,
     Relu,
+    MatMul,
 }
 
 pub fn topo_sort(last: Value) -> Vec<Value> {
@@ -202,7 +236,7 @@ pub fn to_dot(root: &Value) -> String {
 
         writeln!(
             dot,
-            "    {id} [label=\"{{ data: {data:.4} | grad: {grad:.4} }}\"];",
+            "    {id} [label=\"{{ data: {data:?} | grad: {grad:?} }}\"];",
         )
         .unwrap();
 
@@ -211,6 +245,7 @@ pub fn to_dot(root: &Value) -> String {
             let op_label = match op {
                 Operation::Add => "+",
                 Operation::Mul => "*",
+                Operation::MatMul => "@",
                 Operation::Relu => "ReLU",
                 Operation::Sub => "-",
                 Operation::None => unreachable!(),
@@ -242,11 +277,10 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut a = Value::new(1.0);
-        print!("{:?}", a);
-        let mut b = Value::new(2.0);
-        let mut c = &a + &b;
+        let a = Value::new(Array2::from_elem((2, 2), 1.0));
+        let b = Value::new(Array2::from_elem((2, 2), 2.0));
+        let c = &a + &b;
 
-        assert_eq!(c.data(), 3.0);
+        assert_eq!(*c.data(), Array2::from_elem((2, 2), 3.0));
     }
 }
